@@ -1,0 +1,16 @@
+{
+  "hash": "0x0531996982c6a461b9959846ceaa4c2934ad93408b73ee158e129a4b5d057780",
+  "blockNumber": 25840755,
+  "from": "0xfbBe7c8B6009bD5cee28A7d7A68231A4104C3d85",
+  "to": "0x33EeCbf908478C10614626A9D304bfe18B78DD73",
+  "input": "0xa0d3253f000000000000000000000000000000000000000000000000000000005d635bcd000000000000000000000000fbbe7c8b6009bd5cee28a7d7a68231a4104c3d85",
+  "method": "spawn",
+  "args": {
+    "point": 1566792653,
+    "patp": "~fasten-ritbus",
+    "prefix": 23501,
+    "prefixPatp": "~fonlyd",
+    "target": "0xfbBe7c8B6009bD5cee28A7d7A68231A4104C3d85"
+  },
+  "status": 1
+}

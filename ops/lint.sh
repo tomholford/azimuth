@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+
+set -e
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+cd "$SCRIPT_DIR/.."
+
+echo "Linting $(go list ./... | wc -w | tr -d ' ') packages"
+
+if ! [ -x "$(command -v golangci-lint)" ]; then
+  echo "golangci-lint is not installed. Please install it from https://golangci-lint.run/welcome/install/"
+  exit 1
+fi
+
+golangci-lint run

@@ -1,0 +1,68 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - errorlint
+    - lll
+    - nolintlint
+    - whitespace
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    lll:
+      line-length: 140
+      tab-width: 4
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+
+  exclusions:
+    rules:
+      - path: _test.go
+        linters:
+          - errcheck
+    generated: lax
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    gofmt:
+      simplify: true
+    gofumpt:
+      module-path: github.com/tomholford/azimuth
+      extra-rules: false
+  exclusions:
+    generated: lax
+
+issues:
+  max-same-issues: 0
+  max-issues-per-linter: 0
+  uniq-by-line: false

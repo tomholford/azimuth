@@ -1,0 +1,62 @@
+package azimuth
+
+import (
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+)
+
+func TestAzimuthABI(t *testing.T) {
+	parsed, err := AzimuthABI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"getKeys", "getOwnedPoints", "getOwner", "canManage", "getManagerFor", "owner",
+		"getManagementProxy", "getSpawnProxy", "getTransferProxy", "getVotingProxy",
+	} {
+		if _, ok := parsed.Methods[name]; !ok {
+			t.Errorf("missing %s", name)
+		}
+	}
+	if AzimuthAddr() == (common.Address{}) {
+		t.Fatal("zero azimuth address")
+	}
+}
+
+func TestEclipticABI(t *testing.T) {
+	parsed, err := EclipticABI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"configureKeys", "setManagementProxy", "setSpawnProxy", "setTransferProxy",
+		"setVotingProxy", "spawn", "transferPoint", "escape", "cancelEscape",
+		"adopt", "reject", "detach", "owner",
+	} {
+		if _, ok := parsed.Methods[name]; !ok {
+			t.Errorf("missing %s", name)
+		}
+	}
+	want := common.HexToAddress(EclipticAddress)
+	if EclipticAddr() != want || want == (common.Address{}) {
+		t.Fatalf("address %s", EclipticAddr().Hex())
+	}
+}
+
+func TestNewContracts(t *testing.T) {
+	az, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if az.Address != AzimuthAddr() {
+		t.Fatalf("azimuth %s", az.Address.Hex())
+	}
+	ec, err := NewEclipticContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ec.Address != EclipticAddr() {
+		t.Fatalf("ecliptic %s", ec.Address.Hex())
+	}
+}
