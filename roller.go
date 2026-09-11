@@ -180,6 +180,50 @@ func (r *Roller) ConfigureKeys(ctx context.Context, sig string, from L2From, add
 	return r.send(ctx, L2TxConfigureKeys, sig, from, address, data)
 }
 
+func (r *Roller) SetManagementProxy(ctx context.Context, sig string, from L2From, address string, data AddressData) (string, error) {
+	return r.send(ctx, L2TxSetManagementProxy, sig, from, address, data)
+}
+
+func (r *Roller) SetSpawnProxy(ctx context.Context, sig string, from L2From, address string, data AddressData) (string, error) {
+	return r.send(ctx, L2TxSetSpawnProxy, sig, from, address, data)
+}
+
+func (r *Roller) SetTransferProxy(ctx context.Context, sig string, from L2From, address string, data AddressData) (string, error) {
+	return r.send(ctx, L2TxSetTransferProxy, sig, from, address, data)
+}
+
+func (r *Roller) SetVotingProxy(ctx context.Context, sig string, from L2From, address string, data AddressData) (string, error) {
+	return r.send(ctx, L2TxSetVotingProxy, sig, from, address, data)
+}
+
+func (r *Roller) Spawn(ctx context.Context, sig string, from L2From, address string, data SpawnData) (string, error) {
+	return r.send(ctx, L2TxSpawn, sig, from, address, data)
+}
+
+func (r *Roller) TransferPoint(ctx context.Context, sig string, from L2From, address string, data TransferPointData) (string, error) {
+	return r.send(ctx, L2TxTransferPoint, sig, from, address, data)
+}
+
+func (r *Roller) Escape(ctx context.Context, sig string, from L2From, address string, data ShipData) (string, error) {
+	return r.send(ctx, L2TxEscape, sig, from, address, data)
+}
+
+func (r *Roller) CancelEscape(ctx context.Context, sig string, from L2From, address string, data ShipData) (string, error) {
+	return r.send(ctx, L2TxCancelEscape, sig, from, address, data)
+}
+
+func (r *Roller) Adopt(ctx context.Context, sig string, from L2From, address string, data ShipData) (string, error) {
+	return r.send(ctx, L2TxAdopt, sig, from, address, data)
+}
+
+func (r *Roller) Reject(ctx context.Context, sig string, from L2From, address string, data ShipData) (string, error) {
+	return r.send(ctx, L2TxReject, sig, from, address, data)
+}
+
+func (r *Roller) Detach(ctx context.Context, sig string, from L2From, address string, data ShipData) (string, error) {
+	return r.send(ctx, L2TxDetach, sig, from, address, data)
+}
+
 func (r *Roller) GetTransactionStatus(ctx context.Context, hash string) (string, error) {
 	var status string
 	if err := r.rpc(ctx, "getTransactionStatus", map[string]string{"hash": hash}, &status); err != nil {
