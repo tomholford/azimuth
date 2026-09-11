@@ -496,6 +496,124 @@ func TestClientAdoptL2(t *testing.T) {
 	}
 }
 
+func TestClientSubmitL2(t *testing.T) {
+	from := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
+	sig := "0x" + strings.Repeat("ab", 65)
+	mgr := common.HexToAddress("0xF7306c5db0C1880FB2ed9c3972ad3e1A94999196")
+	ctx := context.Background()
+
+	l2Owner := func() Result {
+		res := Result{Dominion: DominionL2}
+		res.Ownership.Owner.Address = from.Hex()
+		res.Ownership.Owner.Nonce = 2
+		return res
+	}
+
+	t.Run("setManagementProxy", func(t *testing.T) {
+		c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+			switch method {
+			case "getPoint":
+				return l2Owner(), nil
+			case "prepareForSigning":
+				return "0xcafe", nil
+			case L2TxSetManagementProxy:
+				var p struct {
+					Sig     string `json:"sig"`
+					Address string `json:"address"`
+				}
+				if err := json.Unmarshal(params, &p); err != nil {
+					return nil, err
+				}
+				if p.Sig != sig || !strings.EqualFold(p.Address, from.Hex()) {
+					return nil, fmt.Errorf("params %+v", p)
+				}
+				return "0xbeef", nil
+			default:
+				return nil, fmt.Errorf("unexpected %s", method)
+			}
+		})
+		u, err := c.SetManagementProxy(ctx, 69, mgr, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := c.SubmitL2(ctx, u, sig, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "0xbeef" {
+			t.Fatalf("hash %q", got)
+		}
+		if c.Roller() == nil {
+			t.Fatal("nil roller")
+		}
+	})
+
+	t.Run("spawn", func(t *testing.T) {
+		c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+			switch method {
+			case "getPoint":
+				res := Result{Dominion: DominionSpawn}
+				res.Ownership.Owner.Address = from.Hex()
+				res.Ownership.Owner.Nonce = 4
+				return res, nil
+			case "prepareForSigning":
+				return "0xsp", nil
+			case L2TxSpawn:
+				return "0xbeef", nil
+			default:
+				return nil, fmt.Errorf("unexpected %s", method)
+			}
+		})
+		u, err := c.Spawn(ctx, 1566792653, mgr, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := c.SubmitL2(ctx, u, sig, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "0xbeef" {
+			t.Fatalf("hash %q", got)
+		}
+	})
+
+	t.Run("escape", func(t *testing.T) {
+		c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+			switch method {
+			case "getPoint":
+				res := Result{Dominion: DominionSpawn}
+				res.Ownership.Owner.Address = from.Hex()
+				res.Ownership.Owner.Nonce = 8
+				return res, nil
+			case "prepareForSigning":
+				return "0xesc", nil
+			case L2TxEscape:
+				return "0xbeef", nil
+			default:
+				return nil, fmt.Errorf("unexpected %s", method)
+			}
+		})
+		u, err := c.Escape(ctx, 256, 0, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := c.SubmitL2(ctx, u, sig, from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "0xbeef" {
+			t.Fatalf("hash %q", got)
+		}
+	})
+}
+
+func TestClientSubmitL2NoRoller(t *testing.T) {
+	_, err := (*Client)(nil).SubmitL2(context.Background(), &Unsigned{Layer: LayerL2}, "0x00", common.Address{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func testClient(t *testing.T, handle func(method string, params json.RawMessage) (any, error)) *Client {
 	t.Helper()
 	roller := mockJSONRPC(t, handle)

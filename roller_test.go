@@ -195,53 +195,111 @@ func TestPrepareForSigningMock(t *testing.T) {
 	}
 }
 
-func TestConfigureKeysMock(t *testing.T) {
-	data := ConfigureKeysData{
+func TestRollerSubmitMock(t *testing.T) {
+	from := L2From{Ship: "~zod", Proxy: ProxyOwn}
+	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
+	sig := "0x" + strings.Repeat("ab", 65)
+	proxyAddr := "0xF7306c5db0C1880FB2ed9c3972ad3e1A94999196"
+	keys := ConfigureKeysData{
 		Encrypt:     "0x" + strings.Repeat("11", 32),
 		Auth:        "0x" + strings.Repeat("22", 32),
 		CryptoSuite: "1",
-		Breach:      false,
 	}
-	from := L2From{Ship: "~zod", Proxy: ProxyManage}
-	addr := "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
-	sig := "0x" + strings.Repeat("ab", 65)
+	proxy := AddressData{Address: proxyAddr}
+	spawn := SpawnData{Address: proxyAddr, Ship: "~pet"}
+	transfer := TransferPointData{Address: proxyAddr, Reset: true}
+	ship := ShipData{Ship: "~wicdev-wisryt"}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Method string `json:"method"`
-			Params struct {
-				Sig     string            `json:"sig"`
-				From    L2From            `json:"from"`
-				Address string            `json:"address"`
-				Data    ConfigureKeysData `json:"data"`
-				Force   bool              `json:"force"`
-			} `json:"params"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("decode: %v", err)
-			return
-		}
-		if req.Method != "configureKeys" {
-			t.Errorf("method %s", req.Method)
-		}
-		if req.Params.Sig != sig || req.Params.Address != addr || req.Params.Force {
-			t.Errorf("params %+v", req.Params)
-		}
-		if req.Params.From != from || req.Params.Data != data {
-			t.Errorf("from/data %+v", req.Params)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":"1337","result":"0xbeef"}`))
-	}))
-	defer srv.Close()
-
-	roller := mustRoller(t, srv.URL)
-	got, err := roller.ConfigureKeys(context.Background(), sig, from, addr, data)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		method string
+		data   any
+		call   func(*Roller) (string, error)
+	}{
+		{L2TxConfigureKeys, keys, func(r *Roller) (string, error) {
+			return r.ConfigureKeys(context.Background(), sig, from, addr, keys)
+		}},
+		{L2TxSetManagementProxy, proxy, func(r *Roller) (string, error) {
+			return r.SetManagementProxy(context.Background(), sig, from, addr, proxy)
+		}},
+		{L2TxSetSpawnProxy, proxy, func(r *Roller) (string, error) {
+			return r.SetSpawnProxy(context.Background(), sig, from, addr, proxy)
+		}},
+		{L2TxSetTransferProxy, proxy, func(r *Roller) (string, error) {
+			return r.SetTransferProxy(context.Background(), sig, from, addr, proxy)
+		}},
+		{L2TxSetVotingProxy, proxy, func(r *Roller) (string, error) {
+			return r.SetVotingProxy(context.Background(), sig, from, addr, proxy)
+		}},
+		{L2TxSpawn, spawn, func(r *Roller) (string, error) {
+			return r.Spawn(context.Background(), sig, from, addr, spawn)
+		}},
+		{L2TxTransferPoint, transfer, func(r *Roller) (string, error) {
+			return r.TransferPoint(context.Background(), sig, from, addr, transfer)
+		}},
+		{L2TxEscape, ship, func(r *Roller) (string, error) {
+			return r.Escape(context.Background(), sig, from, addr, ship)
+		}},
+		{L2TxCancelEscape, ship, func(r *Roller) (string, error) {
+			return r.CancelEscape(context.Background(), sig, from, addr, ship)
+		}},
+		{L2TxAdopt, ship, func(r *Roller) (string, error) {
+			return r.Adopt(context.Background(), sig, from, addr, ship)
+		}},
+		{L2TxReject, ship, func(r *Roller) (string, error) {
+			return r.Reject(context.Background(), sig, from, addr, ship)
+		}},
+		{L2TxDetach, ship, func(r *Roller) (string, error) {
+			return r.Detach(context.Background(), sig, from, addr, ship)
+		}},
 	}
-	if got != "0xbeef" {
-		t.Fatalf("hash %q", got)
+
+	for _, tc := range tests {
+		t.Run(tc.method, func(t *testing.T) {
+			wantData, err := json.Marshal(tc.data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req struct {
+					Method string `json:"method"`
+					Params struct {
+						Sig     string          `json:"sig"`
+						From    L2From          `json:"from"`
+						Address string          `json:"address"`
+						Data    json.RawMessage `json:"data"`
+						Force   bool            `json:"force"`
+					} `json:"params"`
+				}
+				if decErr := json.NewDecoder(r.Body).Decode(&req); decErr != nil {
+					t.Errorf("decode: %v", decErr)
+					return
+				}
+				if req.Method != tc.method {
+					t.Errorf("method %s want %s", req.Method, tc.method)
+				}
+				if req.Params.Sig != sig || req.Params.Address != addr || req.Params.Force {
+					t.Errorf("params %+v", req.Params)
+				}
+				if req.Params.From != from {
+					t.Errorf("from %+v", req.Params.From)
+				}
+				gotData := bytes.TrimSpace(req.Params.Data)
+				if !bytes.Equal(gotData, wantData) {
+					t.Errorf("data %s want %s", gotData, wantData)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":"1337","result":"0xbeef"}`))
+			}))
+			defer srv.Close()
+
+			got, err := tc.call(mustRoller(t, srv.URL))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "0xbeef" {
+				t.Fatalf("hash %q", got)
+			}
+		})
 	}
 }
 

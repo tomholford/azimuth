@@ -51,15 +51,17 @@ func main() {
 		// eth_sendTransaction({to: u.To, data: u.Data})
 		fmt.Printf("L1 %s %x\n", u.To.Hex(), u.Data)
 	case azimuth.LayerL2:
-		// personal_sign(u.Hash), then roller submit with that signature
+		// personal_sign(u.Hash), then c.SubmitL2(ctx, u, sig, from)
 		fmt.Printf("L2 %s nonce=%d hash=%s\n", u.Tx, u.Nonce, u.Hash)
 	}
 }
 ```
 
 `Dial` takes an Ethereum JSON-RPC URL and an optional roller URL (empty uses
-`https://roller.urbit.org/v1/roller`). Writes return [`Unsigned`](unsigned.go):
-this package does not sign or submit.
+`https://roller.urbit.org/v1/roller`). Writes return [`Unsigned`](unsigned.go).
+This package does not sign. After `personal_sign` of an L2 hash, `Client.SubmitL2`
+(or the typed `Roller` methods) posts the signature. L1 stays
+`eth_sendTransaction` / `bind.TransactOpts`.
 
 `@p` helpers: `ParsePoint("~zod")`, `FormatPoint(0)`, `Clan`, `Prefix`.
 

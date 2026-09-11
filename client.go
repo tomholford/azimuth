@@ -47,6 +47,13 @@ func (c *Client) Close() {
 	}
 }
 
+func (c *Client) Roller() *Roller {
+	if c == nil {
+		return nil
+	}
+	return c.roller
+}
+
 // GetPoint prefers the roller (L1+L2). On roller failure it falls back to
 // Azimuth getKeys/getOwner.
 func (c *Client) GetPoint(ctx context.Context, point uint32) (*Point, error) {
@@ -210,6 +217,14 @@ func (c *Client) SetTransferProxy(ctx context.Context, point uint32, transferPro
 
 func (c *Client) SetVotingProxy(ctx context.Context, point uint32, votingProxy, from common.Address) (*Unsigned, error) {
 	return c.setProxy(ctx, point, votingProxy, from, L2TxSetVotingProxy, PackSetVotingProxy, votingProxyRole)
+}
+
+// SubmitL2 posts a signed L2 Unsigned to this client's roller.
+func (c *Client) SubmitL2(ctx context.Context, u *Unsigned, sig string, address common.Address) (string, error) {
+	if c == nil || c.roller == nil {
+		return "", fmt.Errorf("no roller")
+	}
+	return u.SubmitL2(ctx, c.roller, sig, address.Hex())
 }
 
 //
