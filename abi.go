@@ -20,9 +20,12 @@ const (
 	// EclipticAddress is ecliptic.eth on mainnet. Prefer Azimuth owner()
 	// when a live client is available; this is the known fallback.
 	EclipticAddress = "0x33EeCbf908478C10614626A9D304bfe18B78DD73"
+	// ClaimsAddress is the mainnet Claims contract. Prefer Ecliptic claims()
+	// when a live client is available; this is the known fallback.
+	ClaimsAddress = "0xe7e7f69b34D7d9Bd8d61Fb22C33b22708947971A"
 )
 
-//go:embed abi/azimuth.json abi/ecliptic.json
+//go:embed abi/azimuth.json abi/ecliptic.json abi/claims.json
 var abiFS embed.FS
 
 var (
@@ -33,6 +36,10 @@ var (
 	eclipticABIOnce sync.Once
 	eclipticABI     abi.ABI
 	eclipticABIErr  error
+
+	claimsABIOnce sync.Once
+	claimsABI     abi.ABI
+	claimsABIErr  error
 )
 
 //
@@ -53,12 +60,23 @@ func EclipticABI() (abi.ABI, error) {
 	return eclipticABI, eclipticABIErr
 }
 
+func ClaimsABI() (abi.ABI, error) {
+	claimsABIOnce.Do(func() {
+		claimsABI, claimsABIErr = parseABI("abi/claims.json")
+	})
+	return claimsABI, claimsABIErr
+}
+
 func AzimuthAddr() common.Address {
 	return common.HexToAddress(AzimuthAddress)
 }
 
 func EclipticAddr() common.Address {
 	return common.HexToAddress(EclipticAddress)
+}
+
+func ClaimsAddr() common.Address {
+	return common.HexToAddress(ClaimsAddress)
 }
 
 //

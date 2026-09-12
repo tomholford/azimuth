@@ -40,6 +40,14 @@ func NewEclipticContract() (*Contract, error) {
 	return &Contract{ABI: parsed, Address: EclipticAddr()}, nil
 }
 
+func NewClaimsContract() (*Contract, error) {
+	parsed, err := ClaimsABI()
+	if err != nil {
+		return nil, err
+	}
+	return &Contract{ABI: parsed, Address: ClaimsAddr()}, nil
+}
+
 func (c *Contract) Pack(name string, args ...any) ([]byte, error) {
 	data, err := c.ABI.Pack(name, args...)
 	if err != nil {
