@@ -165,6 +165,25 @@ func unpackUint32s(v any) ([]uint32, error) {
 	}
 }
 
+func unpackString(v any) (string, error) {
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected string type %T", v)
+	}
+	return s, nil
+}
+
+func unpackBytes(v any) ([]byte, error) {
+	switch b := v.(type) {
+	case []byte:
+		return b, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unexpected bytes type %T", v)
+	}
+}
+
 func unpackUint32(v any) (uint32, error) {
 	switch n := v.(type) {
 	case uint32:
