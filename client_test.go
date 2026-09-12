@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -605,6 +606,173 @@ func TestClientSubmitL2(t *testing.T) {
 			t.Fatalf("hash %q", got)
 		}
 	})
+}
+
+func TestClientAddClaim(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("unexpected %s", method)
+	})
+
+	u, err := c.AddClaim(context.Background(), 69, "prot1", "claim", []byte{0x01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := PackAddClaim(69, "prot1", "claim", []byte{0x01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Layer != LayerL1 || u.To != ClaimsAddr() || !bytes.Equal(u.Data, want) {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestClientRemoveClaim(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("unexpected %s", method)
+	})
+	u, err := c.RemoveClaim(context.Background(), 69, "prot1", "claim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := PackRemoveClaim(69, "prot1", "claim")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Layer != LayerL1 || u.To != ClaimsAddr() || !bytes.Equal(u.Data, want) {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestClientClearClaims(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("unexpected %s", method)
+	})
+	u, err := c.ClearClaims(context.Background(), 69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := PackClearClaims(69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Layer != LayerL1 || u.To != ClaimsAddr() || !bytes.Equal(u.Data, want) {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestClientAddClaimLiveAddress(t *testing.T) {
+	ec, err := NewEclipticContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	out, err := ec.ABI.Methods["claims"].Outputs.Pack(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimsSel := hexutil.Encode(mustPack(t, ec, "claims")[:4])
+
+	eth := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		switch method {
+		case "eth_chainId", "net_version":
+			return "0x1", nil
+		case "eth_call":
+			data := ethCallData(params)
+			if strings.HasPrefix(data, claimsSel) {
+				return hexutil.Encode(out), nil
+			}
+			return nil, fmt.Errorf("unexpected call %s", data)
+		default:
+			return nil, fmt.Errorf("method not found: %s", method)
+		}
+	})
+	defer eth.Close()
+	roller := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("unexpected %s", method)
+	})
+	defer roller.Close()
+
+	c, err := Dial(eth.URL, roller.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	u, err := c.AddClaim(context.Background(), 69, "prot1", "claim", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.To != live {
+		t.Fatalf("to %s want %s", u.To.Hex(), live.Hex())
+	}
+}
+
+func TestClientGetClaims(t *testing.T) {
+	cl, err := NewClaimsContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	filled, err := cl.ABI.Methods["claims"].Outputs.Pack("prot1", "claim", []byte{0x01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty, err := cl.ABI.Methods["claims"].Outputs.Pack("", "", []byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimsSel := hexutil.Encode(mustPack(t, cl, "claims", uint32(69), big.NewInt(0))[:4])
+
+	eth := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		switch method {
+		case "eth_chainId", "net_version":
+			return "0x1", nil
+		case "eth_call":
+			data := ethCallData(params)
+			if !strings.HasPrefix(data, claimsSel) {
+				return nil, fmt.Errorf("unexpected call %s", data)
+			}
+			idx := claimIndexFromCall(t, cl, data)
+			if idx == 1 {
+				return hexutil.Encode(filled), nil
+			}
+			return hexutil.Encode(empty), nil
+		default:
+			return nil, fmt.Errorf("method not found: %s", method)
+		}
+	})
+	defer eth.Close()
+	roller := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("unexpected %s", method)
+	})
+	defer roller.Close()
+
+	c, err := Dial(eth.URL, roller.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	got, err := c.GetClaims(context.Background(), 69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Protocol != "prot1" || got[0].Claim != "claim" {
+		t.Fatalf("%+v", got)
+	}
+
+	one, err := c.GetClaim(context.Background(), 69, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if one.Protocol != "prot1" {
+		t.Fatalf("%+v", one)
+	}
+}
+
+func TestClientGetClaimsNoEth(t *testing.T) {
+	if _, err := (*Client)(nil).GetClaims(context.Background(), 0); err == nil {
+		t.Fatal("expected error")
+	}
 }
 
 func TestClientSubmitL2NoRoller(t *testing.T) {
