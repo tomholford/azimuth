@@ -219,6 +219,45 @@ func (c *Client) SetVotingProxy(ctx context.Context, point uint32, votingProxy, 
 	return c.setProxy(ctx, point, votingProxy, from, L2TxSetVotingProxy, PackSetVotingProxy, votingProxyRole)
 }
 
+// AddClaim packs an L1 Claims.addClaim. Claims is L1-only; the roller has no claim txs.
+func (c *Client) AddClaim(ctx context.Context, point uint32, protocol, claim string, dossier []byte) (*Unsigned, error) {
+	data, err := PackAddClaim(point, protocol, claim, dossier)
+	if err != nil {
+		return nil, err
+	}
+	return c.unsignedClaims(ctx, data), nil
+}
+
+func (c *Client) RemoveClaim(ctx context.Context, point uint32, protocol, claim string) (*Unsigned, error) {
+	data, err := PackRemoveClaim(point, protocol, claim)
+	if err != nil {
+		return nil, err
+	}
+	return c.unsignedClaims(ctx, data), nil
+}
+
+func (c *Client) ClearClaims(ctx context.Context, point uint32) (*Unsigned, error) {
+	data, err := PackClearClaims(point)
+	if err != nil {
+		return nil, err
+	}
+	return c.unsignedClaims(ctx, data), nil
+}
+
+func (c *Client) GetClaim(ctx context.Context, point uint32, index uint8) (*Claim, error) {
+	if c == nil || c.eth == nil {
+		return nil, fmt.Errorf("no eth client")
+	}
+	return GetClaim(ctx, c.eth, point, index)
+}
+
+func (c *Client) GetClaims(ctx context.Context, point uint32) ([]Claim, error) {
+	if c == nil || c.eth == nil {
+		return nil, fmt.Errorf("no eth client")
+	}
+	return GetClaims(ctx, c.eth, point)
+}
+
 // SubmitL2 posts a signed L2 Unsigned to this client's roller.
 func (c *Client) SubmitL2(ctx context.Context, u *Unsigned, sig string, address common.Address) (string, error) {
 	if c == nil || c.roller == nil {
@@ -306,6 +345,10 @@ func (c *Client) unsignedL1(ctx context.Context, data []byte) *Unsigned {
 	return &Unsigned{Layer: LayerL1, To: c.eclipticAddr(ctx), Data: data}
 }
 
+func (c *Client) unsignedClaims(ctx context.Context, data []byte) *Unsigned {
+	return &Unsigned{Layer: LayerL1, To: c.claimsAddr(ctx), Data: data}
+}
+
 func (c *Client) unsignedL2(
 	ctx context.Context,
 	res *Result,
@@ -347,6 +390,26 @@ func (c *Client) eclipticAddr(ctx context.Context) common.Address {
 		}
 	}
 	return EclipticAddr()
+}
+
+func (c *Client) claimsAddr(ctx context.Context) common.Address {
+	if c.eth == nil {
+		return ClaimsAddr()
+	}
+	ec, err := NewEclipticContract()
+	if err != nil {
+		return ClaimsAddr()
+	}
+	ec.Address = c.eclipticAddr(ctx)
+	out, err := ec.Call(ctx, c.eth, "claims")
+	if err != nil || len(out) != 1 {
+		return ClaimsAddr()
+	}
+	addr, err := unpackAddress(out[0])
+	if err != nil || addr == (common.Address{}) {
+		return ClaimsAddr()
+	}
+	return addr
 }
 
 func (c *Client) getPointL1(ctx context.Context, point uint32) (*Point, error) {

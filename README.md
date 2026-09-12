@@ -3,8 +3,8 @@
 Go client for Urbit [Azimuth](https://github.com/urbit/azimuth) / Ecliptic (L1)
 and the L2 [roller](https://roller.urbit.org/v1/roller).
 
-Reads point state, packs unsigned Ecliptic calls, and talks to the roller.
-Signing stays with the caller (wallet, keystore, Frame, etc).
+Reads point state, packs unsigned Ecliptic and Claims calls, and talks to the
+roller. Signing stays with the caller (wallet, keystore, Frame, etc).
 
 ```
 go get github.com/tomholford/azimuth
@@ -74,18 +74,25 @@ This package does not sign. After `personal_sign` of an L2 hash, `Client.SubmitL
 | --- | --- | --- |
 | `ConfigureKeys`, `SetManagementProxy`, `SetTransferProxy`, `SetVotingProxy`, `TransferPoint` | Ecliptic | roller |
 | `SetSpawnProxy`, `Spawn`, `Escape`, `CancelEscape`, `Adopt`, `Reject`, `Detach` | Ecliptic if dominion is `l1`; roller if `spawn` or `l2` | roller |
+| `AddClaim`, `RemoveClaim`, `ClearClaims` | Claims (always L1) | — |
 
 `Spawn` is issued by the child's prefix. `Adopt` / `Reject` / `Detach` take the
 acting sponsor as the first point argument.
 
-Direct ABI packers (`PackConfigureKeys`, `PackSpawn`, `PackTransferPoint`,
-`PackEscape`, …) if you already know the layer.
+Claims is a separate L1 contract (max 16 per point). The roller has no claim
+txs; L2-deposited points cannot add claims because `canManage` is L1-only.
+`GetClaims` / `GetClaim` read slots.
+
+Direct ABI packers (`PackConfigureKeys`, `PackAddClaim`, `PackSpawn`, …) if you
+already know the layer.
 
 ### Contracts
 
 - Azimuth (data): `0x223c067F8CF28ae173EE5CafEa60cA44C335fecB` — never changes
 - Ecliptic (logic): `Azimuth.owner()`, falling back to
   `0x33EeCbf908478C10614626A9D304bfe18B78DD73`
+- Claims: `Ecliptic.claims()`, falling back to
+  `0xe7e7f69b34D7d9Bd8d61Fb22C33b22708947971A`
 
 ## Dev
 

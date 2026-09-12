@@ -44,6 +44,24 @@ func TestEclipticABI(t *testing.T) {
 	}
 }
 
+func TestClaimsABI(t *testing.T) {
+	parsed, err := ClaimsABI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"addClaim", "removeClaim", "clearClaims", "findClaim", "claims",
+	} {
+		if _, ok := parsed.Methods[name]; !ok {
+			t.Errorf("missing %s", name)
+		}
+	}
+	want := common.HexToAddress(ClaimsAddress)
+	if ClaimsAddr() != want || want == (common.Address{}) {
+		t.Fatalf("address %s", ClaimsAddr().Hex())
+	}
+}
+
 func TestNewContracts(t *testing.T) {
 	az, err := NewAzimuthContract()
 	if err != nil {
@@ -58,5 +76,12 @@ func TestNewContracts(t *testing.T) {
 	}
 	if ec.Address != EclipticAddr() {
 		t.Fatalf("ecliptic %s", ec.Address.Hex())
+	}
+	cl, err := NewClaimsContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cl.Address != ClaimsAddr() {
+		t.Fatalf("claims %s", cl.Address.Hex())
 	}
 }
