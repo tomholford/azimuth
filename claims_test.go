@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -58,6 +59,62 @@ func TestPackAddClaimEmptyDossier(t *testing.T) {
 	if len(unpacked[3].([]byte)) != 0 {
 		t.Fatalf("dossier %x", unpacked[3])
 	}
+}
+
+func TestPackAddClaimGolden(t *testing.T) {
+	var fx struct {
+		Input string `json:"input"`
+		To    string `json:"to"`
+		Args  struct {
+			Point    uint32 `json:"point"`
+			Protocol string `json:"protocol"`
+			Claim    string `json:"claim"`
+			Dossier  string `json:"dossier"`
+		} `json:"args"`
+	}
+	loadJSON(t, "testdata/l1/addClaim-eb718f6e.json", &fx)
+	if common.HexToAddress(fx.To) != ClaimsAddr() {
+		t.Fatalf("to %s", fx.To)
+	}
+
+	onchain := mustHex(t, fx.Input)
+	parsed, err := ClaimsABI()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unpacked, err := parsed.Methods["addClaim"].Inputs.Unpack(onchain[4:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unpacked[0].(uint32) != fx.Args.Point || unpacked[1].(string) != fx.Args.Protocol || unpacked[2].(string) != fx.Args.Claim {
+		t.Fatalf("decoded %v", unpacked)
+	}
+	if len(unpacked[3].([]byte)) != 0 {
+		t.Fatalf("dossier %x", unpacked[3])
+	}
+
+	got, err := PackAddClaim(fx.Args.Point, fx.Args.Protocol, fx.Args.Claim, mustHex(t, fx.Args.Dossier))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// On-chain encoding appends a 32-byte zero word after empty bytes (web3.js).
+	// Canonical ABI is length 0 with no data word; the extra pad still unpacks.
+	if bytes.Equal(got, onchain) {
+		return
+	}
+	if bytes.HasPrefix(onchain, got) && isZero(onchain[len(got):]) {
+		return
+	}
+	t.Fatalf("got %x want %x", got, onchain)
+}
+
+func isZero(b []byte) bool {
+	for _, x := range b {
+		if x != 0 {
+			return false
+		}
+	}
+	return len(b) > 0
 }
 
 func TestPackAddClaimEmptyFields(t *testing.T) {
