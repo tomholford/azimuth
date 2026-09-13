@@ -152,6 +152,24 @@ func (c *Client) Spawn(ctx context.Context, point uint32, target, from common.Ad
 	return c.unsignedL2(ctx, res, prefix, from, L2TxSpawn, payload, spawnProxyRole)
 }
 
+// Deposit packs an L1 transferPoint to Ecliptic.depositAddress. Always L1;
+// already-deposited points and galaxies are rejected.
+func (c *Client) Deposit(ctx context.Context, point uint32) (*Unsigned, error) {
+	p, err := c.GetPoint(ctx, point)
+	if err != nil {
+		return nil, err
+	}
+	if p.Dominion == DominionL2 {
+		return nil, fmt.Errorf("deposit: point %d is already on L2", point)
+	}
+	var data []byte
+	data, err = packDeposit(point, c.depositAddr(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return c.unsignedL1(ctx, data), nil
+}
+
 func (c *Client) TransferPoint(
 	ctx context.Context,
 	point uint32,
@@ -390,6 +408,26 @@ func (c *Client) eclipticAddr(ctx context.Context) common.Address {
 		}
 	}
 	return EclipticAddr()
+}
+
+func (c *Client) depositAddr(ctx context.Context) common.Address {
+	if c.eth == nil {
+		return DepositAddr()
+	}
+	ec, err := NewEclipticContract()
+	if err != nil {
+		return DepositAddr()
+	}
+	ec.Address = c.eclipticAddr(ctx)
+	out, err := ec.Call(ctx, c.eth, "depositAddress")
+	if err != nil || len(out) != 1 {
+		return DepositAddr()
+	}
+	addr, err := unpackAddress(out[0])
+	if err != nil || addr == (common.Address{}) {
+		return DepositAddr()
+	}
+	return addr
 }
 
 func (c *Client) claimsAddr(ctx context.Context) common.Address {

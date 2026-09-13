@@ -34,7 +34,7 @@ func TestEclipticABI(t *testing.T) {
 	for _, name := range []string{
 		"configureKeys", "setManagementProxy", "setSpawnProxy", "setTransferProxy",
 		"setVotingProxy", "spawn", "transferPoint", "escape", "cancelEscape",
-		"adopt", "reject", "detach", "owner",
+		"adopt", "reject", "detach", "owner", "depositAddress",
 	} {
 		if _, ok := parsed.Methods[name]; !ok {
 			t.Errorf("missing %s", name)

@@ -122,6 +122,26 @@ func TestPackTransferPointSelector(t *testing.T) {
 	}
 }
 
+func TestPackDeposit(t *testing.T) {
+	data, err := PackDeposit(256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := PackTransferPoint(256, DepositAddr(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, want) {
+		t.Fatalf("got %x want %x", data, want)
+	}
+	if _, err := PackDeposit(69); err == nil {
+		t.Fatal("galaxy")
+	}
+	if _, err := PackDeposit(0); err == nil {
+		t.Fatal("galaxy ~zod")
+	}
+}
+
 func TestPackEscapeFamily(t *testing.T) {
 	tests := []struct {
 		name string

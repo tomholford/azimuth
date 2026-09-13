@@ -374,6 +374,66 @@ func TestClientTransferPointL1(t *testing.T) {
 	}
 }
 
+func TestClientDepositL1(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		if method != "getPoint" {
+			return nil, fmt.Errorf("unexpected %s", method)
+		}
+		return testPointResult(DominionL1), nil
+	})
+	u, err := c.Deposit(context.Background(), 256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := PackDeposit(256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Layer != LayerL1 || u.To != EclipticAddr() || !bytes.Equal(u.Data, want) {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestClientDepositSpawn(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		if method != "getPoint" {
+			return nil, fmt.Errorf("unexpected %s", method)
+		}
+		return testPointResult(DominionSpawn), nil
+	})
+	u, err := c.Deposit(context.Background(), 256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Layer != LayerL1 {
+		t.Fatalf("%+v", u)
+	}
+}
+
+func TestClientDepositAlreadyL2(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		if method != "getPoint" {
+			return nil, fmt.Errorf("unexpected %s", method)
+		}
+		return testPointResult(DominionL2), nil
+	})
+	if _, err := c.Deposit(context.Background(), 256); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestClientDepositGalaxy(t *testing.T) {
+	c := testClient(t, func(method string, params json.RawMessage) (any, error) {
+		if method != "getPoint" {
+			return nil, fmt.Errorf("unexpected %s", method)
+		}
+		return testPointResult(DominionL1), nil
+	})
+	if _, err := c.Deposit(context.Background(), 69); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestClientTransferPointL2(t *testing.T) {
 	target := common.HexToAddress("0xd1428F18A8255C0984291CEBFc83E6F982F7De9f")
 	from := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
@@ -843,6 +903,15 @@ func getPointL1Fallback(t *testing.T, az *Contract, pointsOut, rightsOut []byte)
 		t.Fatal(err)
 	}
 	return p
+}
+
+func testPointResult(dominion string) Result {
+	res := Result{Dominion: dominion}
+	res.Network.Keys.Life = "1"
+	res.Network.Keys.Suite = "1"
+	res.Network.Keys.Auth = "0x" + strings.Repeat("11", 32)
+	res.Network.Keys.Crypt = "0x" + strings.Repeat("22", 32)
+	return res
 }
 
 func testClient(t *testing.T, handle func(method string, params json.RawMessage) (any, error)) *Client {
