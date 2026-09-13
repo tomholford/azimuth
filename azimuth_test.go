@@ -284,7 +284,10 @@ func TestGetRightsMockRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Owner != owner || got.ManagementProxy != mgmt || got.SpawnProxy != spawn || got.VotingProxy != vote || got.TransferProxy != xfer {
+	if got.Owner != owner || got.ManagementProxy != mgmt || got.SpawnProxy != spawn {
+		t.Fatalf("%+v", got)
+	}
+	if got.VotingProxy != vote || got.TransferProxy != xfer {
 		t.Fatalf("%+v", got)
 	}
 }

@@ -78,7 +78,10 @@ func TestClientGetPointL1Fallback(t *testing.T) {
 	if p.Dominion != DominionL1 || p.Owner.Address != owner || p.Revision != 3 || p.Rift != 7 {
 		t.Fatalf("%+v", p)
 	}
-	if p.ManagementProxy.Address != mgmt || p.SpawnProxy.Address != spawn || p.VotingProxy.Address != vote || p.TransferProxy.Address != xfer {
+	if p.ManagementProxy.Address != mgmt || p.SpawnProxy.Address != spawn {
+		t.Fatalf("proxies %+v", p)
+	}
+	if p.VotingProxy.Address != vote || p.TransferProxy.Address != xfer {
 		t.Fatalf("proxies %+v", p)
 	}
 	if !p.HasSponsor || p.Sponsor != 256 || !p.Active || !p.EscapeRequested || p.EscapeRequestedTo != 512 {
