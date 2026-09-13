@@ -14,6 +14,8 @@ func TestAzimuthABI(t *testing.T) {
 	for _, name := range []string{
 		"getKeys", "getOwnedPoints", "getOwner", "canManage", "getManagerFor", "owner",
 		"getManagementProxy", "getSpawnProxy", "getTransferProxy", "getVotingProxy",
+		"points", "rights", "getSpawned", "getSponsoring", "getEscapeRequests",
+		"getSpawningFor", "getTransferringFor", "getVotingFor",
 	} {
 		if _, ok := parsed.Methods[name]; !ok {
 			t.Errorf("missing %s", name)

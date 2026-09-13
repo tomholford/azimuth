@@ -218,3 +218,128 @@ func TestUnpackUint32sEmpty(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestGetPointDataMockRPC(t *testing.T) {
+	c, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crypt, auth [32]byte
+	copy(crypt[:], bytes.Repeat([]byte{0xaa}, 32))
+	copy(auth[:], bytes.Repeat([]byte{0xbb}, 32))
+	out, err := c.ABI.Methods["points"].Outputs.Pack(
+		crypt, auth, true, true, true, uint32(256), uint32(512), uint32(1), uint32(3), uint32(7),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := mockEthRPC(t, map[string]any{
+		"eth_call": hexutil.Encode(out),
+	})
+	defer srv.Close()
+
+	client, err := ethclient.Dial(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetPointData(context.Background(), client, 69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got.CryptKey, crypt[:]) || !bytes.Equal(got.EdKey, auth[:]) {
+		t.Fatalf("keys %+v", got)
+	}
+	if !got.HasSponsor || !got.Active || !got.EscapeRequested {
+		t.Fatalf("flags %+v", got)
+	}
+	if got.Sponsor != 256 || got.EscapeRequestedTo != 512 || got.Suite != 1 || got.Revision != 3 || got.Rift != 7 {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestGetRightsMockRPC(t *testing.T) {
+	c, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
+	mgmt := common.HexToAddress("0xF7306c5db0C1880FB2ed9c3972ad3e1A94999196")
+	spawn := common.HexToAddress("0xd1428F18A8255C0984291CEBFc83E6F982F7De9f")
+	vote := common.HexToAddress("0x1111111111111111111111111111111111111112")
+	xfer := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	out, err := c.ABI.Methods["rights"].Outputs.Pack(owner, mgmt, spawn, vote, xfer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := mockEthRPC(t, map[string]any{
+		"eth_call": hexutil.Encode(out),
+	})
+	defer srv.Close()
+
+	client, err := ethclient.Dial(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetRights(context.Background(), client, 69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Owner != owner || got.ManagementProxy != mgmt || got.SpawnProxy != spawn || got.VotingProxy != vote || got.TransferProxy != xfer {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestGetListsMockRPC(t *testing.T) {
+	c, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
+	want := []uint32{69, 256}
+	tests := []struct {
+		method string
+		get    func(context.Context, *ethclient.Client) ([]uint32, error)
+	}{
+		{"getSpawned", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetSpawned(ctx, client, 0)
+		}},
+		{"getSponsoring", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetSponsoring(ctx, client, 0)
+		}},
+		{"getEscapeRequests", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetEscapeRequests(ctx, client, 0)
+		}},
+		{"getSpawningFor", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetSpawningFor(ctx, client, addr)
+		}},
+		{"getTransferringFor", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetTransferringFor(ctx, client, addr)
+		}},
+		{"getVotingFor", func(ctx context.Context, client *ethclient.Client) ([]uint32, error) {
+			return GetVotingFor(ctx, client, addr)
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.method, func(t *testing.T) {
+			out, err := c.ABI.Methods[tc.method].Outputs.Pack(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			srv := mockEthRPC(t, map[string]any{
+				"eth_call": hexutil.Encode(out),
+			})
+			defer srv.Close()
+			client, err := ethclient.Dial(srv.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := tc.get(context.Background(), client)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 2 || got[0] != 69 || got[1] != 256 {
+				t.Fatalf("got %v", got)
+			}
+		})
+	}
+}
