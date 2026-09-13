@@ -55,7 +55,7 @@ func (c *Client) Roller() *Roller {
 }
 
 // GetPoint prefers the roller (L1+L2). On roller failure it falls back to
-// Azimuth getKeys/getOwner.
+// Azimuth points() and rights(), inferring dominion from the deposit address.
 func (c *Client) GetPoint(ctx context.Context, point uint32) (*Point, error) {
 	var rollerErr error
 	if c.roller != nil {
@@ -420,25 +420,35 @@ func (c *Client) getPointL1(ctx context.Context, point uint32) (*Point, error) {
 	if err != nil {
 		return nil, err
 	}
-	var keys *Keys
-	keys, err = GetKeys(ctx, c.eth, point)
+	var data *PointData
+	data, err = GetPointData(ctx, c.eth, point)
 	if err != nil {
 		return nil, err
 	}
-	var owner common.Address
-	owner, err = GetOwner(ctx, c.eth, point)
+	var deed *Deed
+	deed, err = GetRights(ctx, c.eth, point)
 	if err != nil {
 		return nil, err
 	}
 	return &Point{
-		Index:    point,
-		Name:     name,
-		Dominion: DominionL1,
-		Owner:    Proxy{Address: owner},
-		CryptKey: keys.CryptKey,
-		EdKey:    keys.EdKey,
-		Suite:    keys.Suite,
-		Revision: keys.Revision,
+		Index:             point,
+		Name:              name,
+		Dominion:          DominionFromDeed(deed.Owner, deed.SpawnProxy),
+		Owner:             Proxy{Address: deed.Owner},
+		ManagementProxy:   Proxy{Address: deed.ManagementProxy},
+		SpawnProxy:        Proxy{Address: deed.SpawnProxy},
+		TransferProxy:     Proxy{Address: deed.TransferProxy},
+		VotingProxy:       Proxy{Address: deed.VotingProxy},
+		CryptKey:          data.CryptKey,
+		EdKey:             data.EdKey,
+		Suite:             data.Suite,
+		Revision:          data.Revision,
+		Rift:              data.Rift,
+		HasSponsor:        data.HasSponsor,
+		Sponsor:           data.Sponsor,
+		Active:            data.Active,
+		EscapeRequested:   data.EscapeRequested,
+		EscapeRequestedTo: data.EscapeRequestedTo,
 	}, nil
 }
 

@@ -38,8 +38,11 @@ type Point struct {
 	Revision uint32 `json:"key_revision_number"`
 	Rift     uint32 `json:"rift"`
 
-	HasSponsor bool   `json:"has_sponsor"`
-	Sponsor    uint32 `json:"sponsor"`
+	HasSponsor        bool   `json:"has_sponsor"`
+	Sponsor           uint32 `json:"sponsor"`
+	Active            bool   `json:"active"`
+	EscapeRequested   bool   `json:"escape_requested"`
+	EscapeRequestedTo uint32 `json:"escape_requested_to"`
 }
 
 //

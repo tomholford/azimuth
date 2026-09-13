@@ -58,57 +58,81 @@ func TestClientGetPointL1Fallback(t *testing.T) {
 	var crypt, auth [32]byte
 	copy(crypt[:], bytes.Repeat([]byte{0xaa}, 32))
 	copy(auth[:], bytes.Repeat([]byte{0xbb}, 32))
-	keysOut, err := az.ABI.Methods["getKeys"].Outputs.Pack(crypt, auth, uint32(1), uint32(3))
-	if err != nil {
-		t.Fatal(err)
-	}
 	owner := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
-	ownerOut, err := az.ABI.Methods["getOwner"].Outputs.Pack(owner)
+	mgmt := common.HexToAddress("0xF7306c5db0C1880FB2ed9c3972ad3e1A94999196")
+	spawn := common.HexToAddress("0xd1428F18A8255C0984291CEBFc83E6F982F7De9f")
+	vote := common.HexToAddress("0x3333333333333333333333333333333333333333")
+	xfer := common.HexToAddress("0x4444444444444444444444444444444444444444")
+
+	pointsOut, err := az.ABI.Methods["points"].Outputs.Pack(
+		crypt, auth, true, true, true, uint32(256), uint32(512), uint32(1), uint32(3), uint32(7),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	keysSel := hexutil.Encode(mustPack(t, az, "getKeys", uint32(0))[:4])
-	ownerSel := hexutil.Encode(mustPack(t, az, "getOwner", uint32(0))[:4])
-
-	eth := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
-		switch method {
-		case "eth_chainId", "net_version":
-			return "0x1", nil
-		case "eth_call":
-			data := ethCallData(params)
-			switch {
-			case strings.HasPrefix(data, keysSel):
-				return hexutil.Encode(keysOut), nil
-			case strings.HasPrefix(data, ownerSel):
-				return hexutil.Encode(ownerOut), nil
-			default:
-				return nil, fmt.Errorf("unexpected call %s", data)
-			}
-		default:
-			return nil, fmt.Errorf("method not found: %s", method)
-		}
-	})
-	defer eth.Close()
-	roller := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
-		return nil, fmt.Errorf("roller down")
-	})
-	defer roller.Close()
-
-	c, err := Dial(eth.URL, roller.URL)
+	rightsOut, err := az.ABI.Methods["rights"].Outputs.Pack(owner, mgmt, spawn, vote, xfer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
-
-	p, err := c.GetPoint(context.Background(), 69)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.Dominion != DominionL1 || p.Owner.Address != owner || p.Revision != 3 {
+	p := getPointL1Fallback(t, az, pointsOut, rightsOut)
+	if p.Dominion != DominionL1 || p.Owner.Address != owner || p.Revision != 3 || p.Rift != 7 {
 		t.Fatalf("%+v", p)
+	}
+	if p.ManagementProxy.Address != mgmt || p.SpawnProxy.Address != spawn || p.VotingProxy.Address != vote || p.TransferProxy.Address != xfer {
+		t.Fatalf("proxies %+v", p)
+	}
+	if !p.HasSponsor || p.Sponsor != 256 || !p.Active || !p.EscapeRequested || p.EscapeRequestedTo != 512 {
+		t.Fatalf("network %+v", p)
 	}
 	if !bytes.Equal(p.CryptKey, crypt[:]) {
 		t.Fatalf("crypt %x", p.CryptKey)
+	}
+}
+
+func TestClientGetPointL1FallbackDeposited(t *testing.T) {
+	az, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var z [32]byte
+	pointsOut, err := az.ABI.Methods["points"].Outputs.Pack(
+		z, z, false, true, false, uint32(0), uint32(0), uint32(0), uint32(0), uint32(0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero := common.Address{}
+	rightsOut, err := az.ABI.Methods["rights"].Outputs.Pack(DepositAddr(), zero, zero, zero, zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := getPointL1Fallback(t, az, pointsOut, rightsOut)
+	if p.Dominion != DominionL2 || p.Owner.Address != DepositAddr() {
+		t.Fatalf("%+v", p)
+	}
+}
+
+func TestClientGetPointL1FallbackSpawn(t *testing.T) {
+	az, err := NewAzimuthContract()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var z [32]byte
+	owner := common.HexToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
+	pointsOut, err := az.ABI.Methods["points"].Outputs.Pack(
+		z, z, true, true, false, uint32(0), uint32(0), uint32(1), uint32(1), uint32(0),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero := common.Address{}
+	rightsOut, err := az.ABI.Methods["rights"].Outputs.Pack(owner, zero, DepositAddr(), zero, zero)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := getPointL1Fallback(t, az, pointsOut, rightsOut)
+	if p.Dominion != DominionSpawn || p.Owner.Address != owner || p.SpawnProxy.Address != DepositAddr() {
+		t.Fatalf("%+v", p)
 	}
 }
 
@@ -780,6 +804,45 @@ func TestClientSubmitL2NoRoller(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
+}
+
+func getPointL1Fallback(t *testing.T, az *Contract, pointsOut, rightsOut []byte) *Point {
+	t.Helper()
+	pointsSel := hexutil.Encode(mustPack(t, az, "points", uint32(0))[:4])
+	rightsSel := hexutil.Encode(mustPack(t, az, "rights", uint32(0))[:4])
+	eth := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		switch method {
+		case "eth_chainId", "net_version":
+			return "0x1", nil
+		case "eth_call":
+			data := ethCallData(params)
+			switch {
+			case strings.HasPrefix(data, pointsSel):
+				return hexutil.Encode(pointsOut), nil
+			case strings.HasPrefix(data, rightsSel):
+				return hexutil.Encode(rightsOut), nil
+			default:
+				return nil, fmt.Errorf("unexpected call %s", data)
+			}
+		default:
+			return nil, fmt.Errorf("method not found: %s", method)
+		}
+	})
+	t.Cleanup(eth.Close)
+	roller := mockJSONRPC(t, func(method string, params json.RawMessage) (any, error) {
+		return nil, fmt.Errorf("roller down")
+	})
+	t.Cleanup(roller.Close)
+	c, err := Dial(eth.URL, roller.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(c.Close)
+	p, err := c.GetPoint(context.Background(), 69)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func testClient(t *testing.T, handle func(method string, params json.RawMessage) (any, error)) *Client {
