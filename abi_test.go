@@ -62,6 +62,16 @@ func TestClaimsABI(t *testing.T) {
 	}
 }
 
+func TestDepositAddr(t *testing.T) {
+	want := common.HexToAddress(DepositAddress)
+	if DepositAddr() != want || want == (common.Address{}) {
+		t.Fatalf("address %s", DepositAddr().Hex())
+	}
+	if DepositAddr() == AzimuthAddr() || DepositAddr() == EclipticAddr() {
+		t.Fatal("deposit address collides with a core contract")
+	}
+}
+
 func TestNewContracts(t *testing.T) {
 	az, err := NewAzimuthContract()
 	if err != nil {
