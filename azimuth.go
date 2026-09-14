@@ -19,6 +19,29 @@ type Keys struct {
 	Revision uint32
 }
 
+// PointData is Azimuth.points — keys, sponsor, escape, continuity.
+type PointData struct {
+	CryptKey          []byte
+	EdKey             []byte
+	HasSponsor        bool
+	Active            bool
+	EscapeRequested   bool
+	Sponsor           uint32
+	EscapeRequestedTo uint32
+	Suite             uint32
+	Revision          uint32
+	Rift              uint32
+}
+
+// Deed is Azimuth.rights — owner and proxies.
+type Deed struct {
+	Owner           common.Address
+	ManagementProxy common.Address
+	SpawnProxy      common.Address
+	VotingProxy     common.Address
+	TransferProxy   common.Address
+}
+
 //
 // Public
 //
@@ -51,25 +74,51 @@ func GetKeys(ctx context.Context, client *ethclient.Client, point uint32) (*Keys
 }
 
 func GetOwnedPoints(ctx context.Context, client *ethclient.Client, whose common.Address) ([]uint32, error) {
-	out, err := azimuthCall(ctx, client, "getOwnedPoints", whose)
-	if err != nil {
-		return nil, err
-	}
-	if len(out) != 1 {
-		return nil, fmt.Errorf("getOwnedPoints: unexpected result count %d", len(out))
-	}
-	return unpackUint32s(out[0])
+	return azimuthUint32s(ctx, client, "getOwnedPoints", whose)
 }
 
 func GetManagerFor(ctx context.Context, client *ethclient.Client, whose common.Address) ([]uint32, error) {
-	out, err := azimuthCall(ctx, client, "getManagerFor", whose)
+	return azimuthUint32s(ctx, client, "getManagerFor", whose)
+}
+
+func GetSpawningFor(ctx context.Context, client *ethclient.Client, whose common.Address) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getSpawningFor", whose)
+}
+
+func GetTransferringFor(ctx context.Context, client *ethclient.Client, whose common.Address) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getTransferringFor", whose)
+}
+
+func GetVotingFor(ctx context.Context, client *ethclient.Client, whose common.Address) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getVotingFor", whose)
+}
+
+func GetSpawned(ctx context.Context, client *ethclient.Client, point uint32) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getSpawned", point)
+}
+
+func GetSponsoring(ctx context.Context, client *ethclient.Client, point uint32) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getSponsoring", point)
+}
+
+func GetEscapeRequests(ctx context.Context, client *ethclient.Client, point uint32) ([]uint32, error) {
+	return azimuthUint32s(ctx, client, "getEscapeRequests", point)
+}
+
+func GetPointData(ctx context.Context, client *ethclient.Client, point uint32) (*PointData, error) {
+	out, err := azimuthCall(ctx, client, "points", point)
 	if err != nil {
 		return nil, err
 	}
-	if len(out) != 1 {
-		return nil, fmt.Errorf("getManagerFor: unexpected result count %d", len(out))
+	return unpackPointData(out)
+}
+
+func GetRights(ctx context.Context, client *ethclient.Client, point uint32) (*Deed, error) {
+	out, err := azimuthCall(ctx, client, "rights", point)
+	if err != nil {
+		return nil, err
 	}
-	return unpackUint32s(out[0])
+	return unpackDeed(out)
 }
 
 func GetOwner(ctx context.Context, client *ethclient.Client, point uint32) (common.Address, error) {
@@ -91,9 +140,9 @@ func CanManage(ctx context.Context, client *ethclient.Client, point uint32, whos
 	if len(out) != 1 {
 		return false, fmt.Errorf("canManage: unexpected result count %d", len(out))
 	}
-	ok, isBool := out[0].(bool)
-	if !isBool {
-		return false, fmt.Errorf("canManage: unexpected type %T", out[0])
+	ok, err := unpackBool(out[0])
+	if err != nil {
+		return false, fmt.Errorf("canManage: %w", err)
 	}
 	return ok, nil
 }
@@ -120,6 +169,108 @@ func azimuthCall(ctx context.Context, client *ethclient.Client, name string, arg
 		return nil, err
 	}
 	return c.Call(ctx, client, name, args...)
+}
+
+func azimuthUint32s(ctx context.Context, client *ethclient.Client, name string, args ...any) ([]uint32, error) {
+	out, err := azimuthCall(ctx, client, name, args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) != 1 {
+		return nil, fmt.Errorf("%s: unexpected result count %d", name, len(out))
+	}
+	return unpackUint32s(out[0])
+}
+
+func unpackPointData(out []any) (*PointData, error) {
+	if len(out) != 10 {
+		return nil, fmt.Errorf("points: unexpected result count %d", len(out))
+	}
+	crypt, err := unpackBytes32(out[0])
+	if err != nil {
+		return nil, fmt.Errorf("points crypt: %w", err)
+	}
+	auth, err := unpackBytes32(out[1])
+	if err != nil {
+		return nil, fmt.Errorf("points auth: %w", err)
+	}
+	hasSponsor, err := unpackBool(out[2])
+	if err != nil {
+		return nil, fmt.Errorf("points hasSponsor: %w", err)
+	}
+	active, err := unpackBool(out[3])
+	if err != nil {
+		return nil, fmt.Errorf("points active: %w", err)
+	}
+	escaping, err := unpackBool(out[4])
+	if err != nil {
+		return nil, fmt.Errorf("points escapeRequested: %w", err)
+	}
+	sponsor, err := unpackUint32(out[5])
+	if err != nil {
+		return nil, fmt.Errorf("points sponsor: %w", err)
+	}
+	escapeTo, err := unpackUint32(out[6])
+	if err != nil {
+		return nil, fmt.Errorf("points escapeRequestedTo: %w", err)
+	}
+	suite, err := unpackUint32(out[7])
+	if err != nil {
+		return nil, fmt.Errorf("points suite: %w", err)
+	}
+	rev, err := unpackUint32(out[8])
+	if err != nil {
+		return nil, fmt.Errorf("points revision: %w", err)
+	}
+	rift, err := unpackUint32(out[9])
+	if err != nil {
+		return nil, fmt.Errorf("points continuity: %w", err)
+	}
+	return &PointData{
+		CryptKey:          crypt,
+		EdKey:             auth,
+		HasSponsor:        hasSponsor,
+		Active:            active,
+		EscapeRequested:   escaping,
+		Sponsor:           sponsor,
+		EscapeRequestedTo: escapeTo,
+		Suite:             suite,
+		Revision:          rev,
+		Rift:              rift,
+	}, nil
+}
+
+func unpackDeed(out []any) (*Deed, error) {
+	if len(out) != 5 {
+		return nil, fmt.Errorf("rights: unexpected result count %d", len(out))
+	}
+	owner, err := unpackAddress(out[0])
+	if err != nil {
+		return nil, fmt.Errorf("rights owner: %w", err)
+	}
+	mgmt, err := unpackAddress(out[1])
+	if err != nil {
+		return nil, fmt.Errorf("rights managementProxy: %w", err)
+	}
+	spawn, err := unpackAddress(out[2])
+	if err != nil {
+		return nil, fmt.Errorf("rights spawnProxy: %w", err)
+	}
+	vote, err := unpackAddress(out[3])
+	if err != nil {
+		return nil, fmt.Errorf("rights votingProxy: %w", err)
+	}
+	xfer, err := unpackAddress(out[4])
+	if err != nil {
+		return nil, fmt.Errorf("rights transferProxy: %w", err)
+	}
+	return &Deed{
+		Owner:           owner,
+		ManagementProxy: mgmt,
+		SpawnProxy:      spawn,
+		VotingProxy:     vote,
+		TransferProxy:   xfer,
+	}, nil
 }
 
 func unpackAddress(v any) (common.Address, error) {
@@ -182,6 +333,14 @@ func unpackBytes(v any) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected bytes type %T", v)
 	}
+}
+
+func unpackBool(v any) (bool, error) {
+	ok, isBool := v.(bool)
+	if !isBool {
+		return false, fmt.Errorf("unexpected type %T", v)
+	}
+	return ok, nil
 }
 
 func unpackUint32(v any) (uint32, error) {

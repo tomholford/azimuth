@@ -23,6 +23,10 @@ const (
 	// ClaimsAddress is the mainnet Claims contract. Prefer Ecliptic claims()
 	// when a live client is available; this is the known fallback.
 	ClaimsAddress = "0xe7e7f69b34D7d9Bd8d61Fb22C33b22708947971A"
+	// DepositAddress is Ecliptic.depositAddress — ships sent here are on L2.
+	// Prefer Ecliptic depositAddress() when a live client is available; this
+	// is the known fallback (the constant never changes).
+	DepositAddress = "0x1111111111111111111111111111111111111111"
 )
 
 //go:embed abi/azimuth.json abi/ecliptic.json abi/claims.json
@@ -77,6 +81,10 @@ func EclipticAddr() common.Address {
 
 func ClaimsAddr() common.Address {
 	return common.HexToAddress(ClaimsAddress)
+}
+
+func DepositAddr() common.Address {
+	return common.HexToAddress(DepositAddress)
 }
 
 //

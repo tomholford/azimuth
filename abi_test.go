@@ -14,6 +14,8 @@ func TestAzimuthABI(t *testing.T) {
 	for _, name := range []string{
 		"getKeys", "getOwnedPoints", "getOwner", "canManage", "getManagerFor", "owner",
 		"getManagementProxy", "getSpawnProxy", "getTransferProxy", "getVotingProxy",
+		"points", "rights", "getSpawned", "getSponsoring", "getEscapeRequests",
+		"getSpawningFor", "getTransferringFor", "getVotingFor",
 	} {
 		if _, ok := parsed.Methods[name]; !ok {
 			t.Errorf("missing %s", name)
@@ -32,7 +34,7 @@ func TestEclipticABI(t *testing.T) {
 	for _, name := range []string{
 		"configureKeys", "setManagementProxy", "setSpawnProxy", "setTransferProxy",
 		"setVotingProxy", "spawn", "transferPoint", "escape", "cancelEscape",
-		"adopt", "reject", "detach", "owner",
+		"adopt", "reject", "detach", "owner", "depositAddress",
 	} {
 		if _, ok := parsed.Methods[name]; !ok {
 			t.Errorf("missing %s", name)
@@ -59,6 +61,16 @@ func TestClaimsABI(t *testing.T) {
 	want := common.HexToAddress(ClaimsAddress)
 	if ClaimsAddr() != want || want == (common.Address{}) {
 		t.Fatalf("address %s", ClaimsAddr().Hex())
+	}
+}
+
+func TestDepositAddr(t *testing.T) {
+	want := common.HexToAddress(DepositAddress)
+	if DepositAddr() != want || want == (common.Address{}) {
+		t.Fatalf("address %s", DepositAddr().Hex())
+	}
+	if DepositAddr() == AzimuthAddr() || DepositAddr() == EclipticAddr() {
+		t.Fatal("deposit address collides with a core contract")
 	}
 }
 

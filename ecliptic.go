@@ -59,6 +59,19 @@ func PackTransferPoint(point uint32, target common.Address, reset bool) ([]byte,
 	return packEcliptic("transferPoint", point, target, reset)
 }
 
+// PackDeposit is transferPoint to the L2 deposit address with reset. Galaxies
+// cannot be deposited.
+func PackDeposit(point uint32) ([]byte, error) {
+	return packDeposit(point, DepositAddr())
+}
+
+func packDeposit(point uint32, target common.Address) ([]byte, error) {
+	if point <= 0xff {
+		return nil, fmt.Errorf("deposit: point %d is a galaxy", point)
+	}
+	return PackTransferPoint(point, target, true)
+}
+
 func PackEscape(point, sponsor uint32) ([]byte, error) {
 	return packEcliptic("escape", point, sponsor)
 }

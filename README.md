@@ -65,6 +65,13 @@ This package does not sign. After `personal_sign` of an L2 hash, `Client.SubmitL
 
 `@p` helpers: `ParsePoint("~zod")`, `FormatPoint(0)`, `Clan`, `Prefix`.
 
+`GetPoint` prefers the roller. On roller failure it reads Azimuth `points()`
+and `rights()`, and infers dominion from the L2 deposit address (owner there
+is `l2`; spawn proxy there is `spawn`). Package-level L1 readers:
+`GetPointData`, `GetRights`, `GetSpawned`, `GetSponsoring`, `GetEscapeRequests`,
+`GetSpawningFor`, `GetTransferringFor`, `GetVotingFor` (plus `GetOwnedPoints`
+/ `GetManagerFor`).
+
 ### Writes
 
 `Client` reads dominion from the roller, then packs L1 calldata or an L2
@@ -75,16 +82,21 @@ This package does not sign. After `personal_sign` of an L2 hash, `Client.SubmitL
 | `ConfigureKeys`, `SetManagementProxy`, `SetTransferProxy`, `SetVotingProxy`, `TransferPoint` | Ecliptic | roller |
 | `SetSpawnProxy`, `Spawn`, `Escape`, `CancelEscape`, `Adopt`, `Reject`, `Detach` | Ecliptic if dominion is `l1`; roller if `spawn` or `l2` | roller |
 | `AddClaim`, `RemoveClaim`, `ClearClaims` | Claims (always L1) | — |
+| `Deposit` | Ecliptic `transferPoint` to the deposit address (always L1) | — |
 
 `Spawn` is issued by the child's prefix. `Adopt` / `Reject` / `Detach` take the
 acting sponsor as the first point argument.
+
+`Deposit` moves a star or planet to L2. Galaxies and already-deposited points
+are rejected. Do not use `TransferPoint` to the deposit address for an L2
+point — that would pack a roller transfer, not a deposit.
 
 Claims is a separate L1 contract (max 16 per point). The roller has no claim
 txs; L2-deposited points cannot add claims because `canManage` is L1-only.
 `GetClaims` / `GetClaim` read slots.
 
-Direct ABI packers (`PackConfigureKeys`, `PackAddClaim`, `PackSpawn`, …) if you
-already know the layer.
+Direct ABI packers (`PackConfigureKeys`, `PackAddClaim`, `PackDeposit`,
+`PackSpawn`, …) if you already know the layer.
 
 ### Contracts
 
@@ -93,6 +105,8 @@ already know the layer.
   `0x33EeCbf908478C10614626A9D304bfe18B78DD73`
 - Claims: `Ecliptic.claims()`, falling back to
   `0xe7e7f69b34D7d9Bd8d61Fb22C33b22708947971A`
+- L2 deposit: `Ecliptic.depositAddress()`, falling back to
+  `0x1111111111111111111111111111111111111111`
 
 ## Dev
 

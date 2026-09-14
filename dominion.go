@@ -1,6 +1,10 @@
 package azimuth
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 //
 // Constants
@@ -21,6 +25,20 @@ const (
 
 func IsL1Dominion(d string) bool {
 	return d == DominionL1
+}
+
+// DominionFromDeed infers L1/L2/spawn from Azimuth owner and spawn proxy.
+// Owner at the deposit address means the point itself is on L2; spawn proxy
+// at the deposit address means only spawn rights were deposited.
+func DominionFromDeed(owner, spawnProxy common.Address) string {
+	deposit := DepositAddr()
+	if owner == deposit {
+		return DominionL2
+	}
+	if spawnProxy == deposit {
+		return DominionSpawn
+	}
+	return DominionL1
 }
 
 // KeysWritePath is where keys set submits: L1 and spawn stay on Ecliptic;
