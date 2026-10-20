@@ -347,10 +347,23 @@ func NewRoller() *Roller {
 	return r
 }
 
+// NewRollerURL returns a Roller for raw using the default 30s HTTP client.
+// An empty raw uses DefaultRollerURL.
 func NewRollerURL(raw string) (*Roller, error) {
+	return NewRollerHTTP(raw, nil)
+}
+
+// NewRollerHTTP is NewRollerURL with the client used for every call.
+// A nil client uses the default, which times out after 30s.
+// A non-nil client is stored as given. Timeout zero means no client ceiling.
+// A deadline on the context passed to a call still cancels that call.
+func NewRollerHTTP(raw string, client *http.Client) (*Roller, error) {
+	if client == nil {
+		client = defaultHTTP()
+	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return &Roller{apiURL: defaultAPIURL, http: defaultHTTP()}, nil
+		return &Roller{apiURL: defaultAPIURL, http: client}, nil
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -359,7 +372,7 @@ func NewRollerURL(raw string) (*Roller, error) {
 	if u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("roller URL %q: need scheme and host", raw)
 	}
-	return &Roller{apiURL: *u, http: defaultHTTP()}, nil
+	return &Roller{apiURL: *u, http: client}, nil
 }
 
 //

@@ -63,6 +63,10 @@ This package does not sign. After `personal_sign` of an L2 hash, `Client.SubmitL
 (or the typed `Roller` methods) posts the signature. L1 stays
 `eth_sendTransaction` / `bind.TransactOpts`.
 
+`NewRollerURL` uses a 30s HTTP client. `NewRollerHTTP` takes an `*http.Client`
+when a read should fail faster. A deadline on the `context` passed to `GetPoint`
+still cancels the call.
+
 `@p` helpers: `ParsePoint("~zod")`, `FormatPoint(0)`, `Clan`, `Prefix`.
 
 `GetPoint` prefers the roller. On roller failure it reads Azimuth `points()`
