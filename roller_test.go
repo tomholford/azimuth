@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseShipIDs(t *testing.T) {
@@ -147,6 +148,111 @@ func TestNewRollerURL(t *testing.T) {
 	}
 	if _, err := NewRollerURL("not-a-url"); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestNewRollerHTTP(t *testing.T) {
+	r, err := NewRollerHTTP("", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.apiURL != defaultAPIURL {
+		t.Fatalf("empty: %s", r.apiURL.String())
+	}
+	if r.http == nil || r.http.Timeout != 30*time.Second {
+		t.Fatalf("nil client timeout: %v", r.http)
+	}
+
+	def, err := NewRollerURL("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if def.http == nil || def.http.Timeout != 30*time.Second {
+		t.Fatalf("NewRollerURL timeout: %v", def.http)
+	}
+
+	client := &http.Client{Timeout: 0}
+	r, err = NewRollerHTTP("http://127.0.0.1:8080/v1/roller", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.http != client {
+		t.Fatal("client not stored")
+	}
+	if r.apiURL.Host != "127.0.0.1:8080" || r.apiURL.Path != "/v1/roller" {
+		t.Fatalf("got %s", r.apiURL.String())
+	}
+
+	if _, err := NewRollerHTTP("not-a-url", client); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestRollerHTTPTimeout(t *testing.T) {
+	raw, stop := hangingRollerServer(t)
+	defer stop()
+
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	roller, err := NewRollerHTTP(raw, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = getPointWithin(t, roller, context.Background())
+	if err == nil {
+		t.Fatal("expected timeout")
+	}
+	if !strings.Contains(err.Error(), "Client.Timeout exceeded while awaiting headers") {
+		t.Fatalf("error: %v", err)
+	}
+}
+
+func TestRollerHTTPContextDeadline(t *testing.T) {
+	raw, stop := hangingRollerServer(t)
+	defer stop()
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	roller, err := NewRollerHTTP(raw, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	err = getPointWithin(t, roller, ctx)
+	if err == nil {
+		t.Fatal("expected deadline")
+	}
+	if strings.Contains(err.Error(), "Client.Timeout exceeded while awaiting headers") {
+		t.Fatalf("client timeout fired: %v", err)
+	}
+}
+
+// hangingRollerServer accepts the call and writes no headers until stop.
+func hangingRollerServer(t *testing.T) (raw string, stop func()) {
+	t.Helper()
+	done := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-done
+	}))
+	return srv.URL, func() {
+		close(done)
+		srv.Close()
+	}
+}
+
+// getPointWithin fails the test when GetPoint is still blocked after 3s.
+func getPointWithin(t *testing.T, roller *Roller, ctx context.Context) error {
+	t.Helper()
+	errc := make(chan error, 1)
+	go func() {
+		_, err := roller.GetPoint(ctx, 0)
+		errc <- err
+	}()
+	select {
+	case err := <-errc:
+		return err
+	case <-time.After(3 * time.Second):
+		t.Fatal("GetPoint still blocked after 3s")
+		return nil
 	}
 }
 
